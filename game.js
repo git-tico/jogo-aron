@@ -252,10 +252,10 @@ function update() {
 
   // Bounds
   r.x = clamp(r.x, CFG.ROCKET_W * 0.55, W - CFG.ROCKET_W * 0.55);
-  const floor = H * CFG.FLOOR_RATIO;
-  const ceil  = CFG.ROCKET_H * 0.65;
-  if (r.y > floor) { r.y = floor; r.vy = 0; }
-  if (r.y < ceil)  { r.y = ceil;  r.vy = 0; }
+  const floor    = H * CFG.FLOOR_RATIO;
+  const followY  = H * 0.35;
+  if (r.y > floor)   { r.y = floor; r.vy = 0; }
+  if (r.y < followY) { r.y = followY; }
 
   // Altitude accrues only while moving upward
   if (r.vy < 0) {
