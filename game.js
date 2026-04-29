@@ -301,13 +301,13 @@ function update() {
   // Bounds
   r.x = clamp(r.x, CFG.ROCKET_W * 0.55, W - CFG.ROCKET_W * 0.55);
   const floor    = H * CFG.FLOOR_RATIO;
-  const followY  = H * 0.35;
+  const followY  = H * 0.45;
   if (r.y > floor)   { r.y = floor; r.vy = 0; }
   if (r.y < followY) { r.y = followY; }
 
   // Altitude accrues only while moving upward
   if (r.vy < 0) {
-    const gain = Math.abs(r.vy) * 0.45;
+    const gain = Math.abs(r.vy) * 0.35;
     game.altitude += gain;
     game.scroll   += gain;
   }
