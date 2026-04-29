@@ -18,7 +18,7 @@ window.addEventListener('resize', () => {
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const CFG = {
   GRAVITY:       0.055,
-  BOOST:        -5.4,
+  THRUST:       -0.25,
   MAX_UP:       -11,
   MAX_SIDE:      5,
   FRIC_X:        0.86,
@@ -191,44 +191,66 @@ function spawnConfetti() {
 }
 
 // ─── INPUT ───────────────────────────────────────────────────────────────────
-let dragX = null;
+let touchCount = 0;
+let mouseDown  = false;
+let dragX      = null;
 
-function onDown(e) {
-  e.preventDefault();
-  const cx = e.touches ? e.touches[0].clientX : e.clientX;
+function isPressed() { return touchCount > 0 || mouseDown; }
+
+function startPress(cx) {
   dragX = cx;
-
-  // iOS requires user gesture to resume AudioContext
   if (actx && actx.state === 'suspended') actx.resume();
-
   if (game.phase === 'playing') {
-    game.rocket.vy = Math.max(CFG.MAX_UP, game.rocket.vy + CFG.BOOST);
     game.tapped = true;
     sndBoost();
   }
 }
 
-function onMove(e) {
-  e.preventDefault();
+function moveDrag(cx) {
   if (dragX === null || game.phase !== 'playing') return;
-  const cx = e.touches ? e.touches[0].clientX : e.clientX;
-  const dx = cx - dragX;
+  game.rocket.vx = clamp(game.rocket.vx + (cx - dragX) * 0.35, -CFG.MAX_SIDE, CFG.MAX_SIDE);
   dragX = cx;
-  game.rocket.vx = clamp(game.rocket.vx + dx * 0.35, -CFG.MAX_SIDE, CFG.MAX_SIDE);
 }
 
-function onUp(e) {
+canvas.addEventListener('touchstart', e => {
   e.preventDefault();
-  dragX = null;
-}
+  const wasPressed = isPressed();
+  touchCount = e.touches.length;
+  if (!wasPressed) startPress(e.touches[0].clientX);
+  else dragX = e.touches[0].clientX;
+}, { passive: false });
 
-canvas.addEventListener('touchstart',  onDown, { passive: false });
-canvas.addEventListener('touchmove',   onMove, { passive: false });
-canvas.addEventListener('touchend',    onUp,   { passive: false });
-canvas.addEventListener('touchcancel', onUp,   { passive: false });
-canvas.addEventListener('mousedown',   onDown);
-canvas.addEventListener('mousemove',   onMove);
-canvas.addEventListener('mouseup',     onUp);
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  moveDrag(e.touches[0].clientX);
+}, { passive: false });
+
+function onTouchEnd(e) {
+  e.preventDefault();
+  touchCount = e.touches.length;
+  if (!isPressed()) dragX = null;
+  else dragX = e.touches[0].clientX;
+}
+canvas.addEventListener('touchend',    onTouchEnd, { passive: false });
+canvas.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+canvas.addEventListener('mousedown', e => {
+  e.preventDefault();
+  const wasPressed = isPressed();
+  mouseDown = true;
+  if (!wasPressed) startPress(e.clientX);
+  else dragX = e.clientX;
+});
+canvas.addEventListener('mousemove', e => {
+  if (!mouseDown) return;
+  e.preventDefault();
+  moveDrag(e.clientX);
+});
+canvas.addEventListener('mouseup', e => {
+  e.preventDefault();
+  mouseDown = false;
+  if (!isPressed()) dragX = null;
+});
 
 // ─── UPDATE ──────────────────────────────────────────────────────────────────
 function update() {
@@ -245,6 +267,7 @@ function update() {
 
   // Physics
   r.vy += CFG.GRAVITY;
+  if (isPressed()) r.vy += CFG.THRUST;
   r.vx *= CFG.FRIC_X;
   r.vy  = Math.max(CFG.MAX_UP, r.vy);
   r.x  += r.vx;
@@ -603,7 +626,7 @@ function drawHint() {
   ctx.textBaseline = 'middle';
   ctx.shadowColor = 'rgba(100,180,255,0.8)';
   ctx.shadowBlur = 12;
-  ctx.fillText('Toque na tela! 👆', W * 0.5, H * 0.90);
+  ctx.fillText('Segure a tela! 👆', W * 0.5, H * 0.90);
   ctx.restore();
 }
 

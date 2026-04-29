@@ -1,4 +1,4 @@
-const CACHE = 'foguete-v2';
+const CACHE = 'foguete-v3';
 const FILES = [
   './',
   './index.html',
