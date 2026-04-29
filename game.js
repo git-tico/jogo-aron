@@ -1,5 +1,7 @@
 'use strict';
 
+const VERSION = 'v6';
+
 // ─── CANVAS ──────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -26,7 +28,7 @@ const CFG = {
   ROCKET_H:      86,
   ROCKET_W:      38,
   FLOOR_RATIO:   0.80,
-  FINISH_ALT:    5500,
+  FINISH_ALT:    30000,
   CELEBRATE_S:   10,
   STARS:         150,
   GEM_R:         28,
@@ -74,9 +76,61 @@ function sndCelebrate() {
 }
 
 function sndGem() {
-  [880, 1175, 1568].forEach((f, i) =>
-    setTimeout(() => tone(f, 0.16, 0.22), i * 55)
+  // Sparkle ascendente — 4 notas, mais alto e marcante
+  [880, 1175, 1568, 2093].forEach((f, i) =>
+    setTimeout(() => tone(f, 0.22, 0.30), i * 60)
   );
+}
+
+// ─── MÚSICA DE FUNDO ─────────────────────────────────────────────────────────
+// Pentatônica de C: C5 D5 E5 G5 A5 — tom espaçoso e calmo
+const BG_MELODY = [523, 659, 784, 880, 784, 659, 523, 392, 440, 523, 659, 880, 784, 659];
+let bgMusic = null;
+
+function startBgMusic() {
+  if (bgMusic) return;
+  const a = audio();
+
+  function makeDrone(freq, detune, vol) {
+    const osc = a.createOscillator();
+    const g   = a.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    osc.detune.value    = detune;
+    g.gain.value        = vol;
+    osc.connect(g); g.connect(a.destination);
+    osc.start();
+    return { osc, g };
+  }
+
+  // Drone cósmico: A2 + leve desafino para efeito chorus
+  const d1 = makeDrone(110,   0, 0.045);
+  const d2 = makeDrone(110,  10, 0.030);
+  const d3 = makeDrone(220,  -5, 0.020);
+
+  let step = 0;
+  function scheduleNote() {
+    if (!bgMusic) return;
+    const freq = BG_MELODY[step % BG_MELODY.length];
+    step++;
+    tone(freq, 0.055, 0.9, freq * 0.96, 'sine');
+    bgMusic.timer = setTimeout(scheduleNote, 800);
+  }
+
+  bgMusic = { d1, d2, d3, timer: null };
+  bgMusic.timer = setTimeout(scheduleNote, 400);
+}
+
+function stopBgMusic() {
+  if (!bgMusic) return;
+  clearTimeout(bgMusic.timer);
+  [bgMusic.d1, bgMusic.d2, bgMusic.d3].forEach(({ osc, g }) => {
+    try {
+      g.gain.setTargetAtTime(0, audio().currentTime, 0.8);
+      osc.stop(audio().currentTime + 2);
+    } catch (_) {}
+  });
+  bgMusic = null;
 }
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
@@ -130,11 +184,12 @@ function makeStars() {
 
 function makePlanets() {
   return [
-    { x: W * 0.76, wy: 1100, r: 52, col: '#e8674a', rings: false },
-    { x: W * 0.18, wy: 2200, r: 44, col: '#7ab8e8', rings: true  },
-    { x: W * 0.70, wy: 3300, r: 66, col: '#9b59b6', rings: false },
-    { x: W * 0.22, wy: 4400, r: 40, col: '#2ecc71', rings: true  },
-    { x: W * 0.78, wy: 5100, r: 50, col: '#f39c12', rings: false },
+    { x: W * 0.76, wy:  3000, r: 52, col: '#e8674a', rings: false },
+    { x: W * 0.18, wy:  7000, r: 44, col: '#7ab8e8', rings: true  },
+    { x: W * 0.70, wy: 12000, r: 66, col: '#9b59b6', rings: false },
+    { x: W * 0.25, wy: 17000, r: 40, col: '#2ecc71', rings: true  },
+    { x: W * 0.72, wy: 22000, r: 58, col: '#f39c12', rings: false },
+    { x: W * 0.30, wy: 27000, r: 72, col: '#e74c3c', rings: true  },
   ];
 }
 
@@ -227,6 +282,7 @@ function startPress(cx) {
   if (game.phase === 'playing') {
     game.tapped = true;
     sndBoost();
+    startBgMusic();
   }
 }
 
@@ -409,6 +465,7 @@ function draw() {
   drawRocket(game.rocket.x, game.rocket.y);
   drawProgress(prog);
   drawHint();
+  drawVersion();
 
   if (game.phase === 'win') {
     drawConfetti();
@@ -727,6 +784,16 @@ function drawConfetti() {
     ctx.fillRect(-c.w * 0.5, -c.h * 0.5, c.w, c.h);
     ctx.restore();
   });
+}
+
+function drawVersion() {
+  ctx.save();
+  ctx.font         = '11px monospace';
+  ctx.fillStyle    = 'rgba(255,255,255,0.30)';
+  ctx.textAlign    = 'right';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(VERSION, W - 10, H - 6);
+  ctx.restore();
 }
 
 function drawWin() {
