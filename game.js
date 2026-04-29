@@ -131,7 +131,7 @@ function makePlanets() {
 function makeClouds() {
   return Array.from({ length: 7 }, (_, i) => ({
     x:  rng(W * 0.05, W * 0.95),
-    wy: i * 170 + 60,
+    wy: i * 110 + 30,
     wr: rng(55, 120),
     hr: rng(14, 28),
   }));
@@ -391,7 +391,7 @@ function drawStars(prog) {
   const rates = [0.2, 0.5, 1.0];
   game.stars.forEach(s => {
     const offset = game.scroll * rates[s.layer];
-    let sy = s.y - (offset % (H * 5));
+    let sy = s.y + (offset % (H * 5));
     while (sy >  H + 4) sy -= H * 5;
     while (sy < -4)     sy += H * 5;
     s.phase += s.spd;
@@ -407,7 +407,7 @@ function drawClouds(prog) {
   const alpha = Math.max(0, 1 - prog * 10);
   if (alpha < 0.01) return;
   game.clouds.forEach(c => {
-    const sy = c.wy - game.scroll;
+    const sy = c.wy + game.scroll;
     if (sy < -80 || sy > H + 80) return;
     ctx.save();
     ctx.globalAlpha = alpha * 0.55;
@@ -423,7 +423,7 @@ function drawClouds(prog) {
 
 function drawPlanets() {
   game.planets.forEach(p => {
-    const sy = p.wy - game.scroll;
+    const sy = game.scroll - p.wy + H * 0.5;
     if (sy < -p.r * 3 || sy > H + p.r * 3) return;
     ctx.save();
 
