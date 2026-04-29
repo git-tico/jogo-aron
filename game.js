@@ -19,6 +19,7 @@ window.addEventListener('resize', () => {
 const CFG = {
   GRAVITY:       0.055,
   THRUST:       -0.25,
+  RELEASE_DAMP:  0.92,
   MAX_UP:       -11,
   MAX_SIDE:      5,
   FRIC_X:        0.86,
@@ -28,6 +29,8 @@ const CFG = {
   FINISH_ALT:    5500,
   CELEBRATE_S:   10,
   STARS:         150,
+  GEM_R:         28,
+  GEM_SPACING:   400,
 };
 
 // ─── AUDIO ───────────────────────────────────────────────────────────────────
@@ -70,6 +73,12 @@ function sndCelebrate() {
   );
 }
 
+function sndGem() {
+  [880, 1175, 1568].forEach((f, i) =>
+    setTimeout(() => tone(f, 0.16, 0.22), i * 55)
+  );
+}
+
 // ─── STATE ───────────────────────────────────────────────────────────────────
 let game;
 
@@ -89,6 +98,7 @@ function newGame() {
     stars:    makeStars(),
     planets:  makePlanets(),
     clouds:   makeClouds(),
+    gems:     makeGems(),
 
     shooting: [],
     flames:   [],
@@ -135,6 +145,20 @@ function makeClouds() {
     wr: rng(55, 120),
     hr: rng(14, 28),
   }));
+}
+
+function makeGems() {
+  const gems = [];
+  for (let alt = 400; alt < CFG.FINISH_ALT - 200; alt += CFG.GEM_SPACING + rng(-80, 80)) {
+    gems.push({
+      x:    rng(W * 0.18, W * 0.82),
+      wy:   alt,
+      bob:  rng(0, Math.PI * 2),
+      hue:  rng(0, 360),
+      taken: false,
+    });
+  }
+  return gems;
 }
 
 // ─── PARTICLES ───────────────────────────────────────────────────────────────
@@ -267,7 +291,8 @@ function update() {
 
   // Physics
   r.vy += CFG.GRAVITY;
-  if (isPressed()) r.vy += CFG.THRUST;
+  if (isPressed())          r.vy += CFG.THRUST;
+  else if (r.vy < 0)        r.vy *= CFG.RELEASE_DAMP;
   r.vx *= CFG.FRIC_X;
   r.vy  = Math.max(CFG.MAX_UP, r.vy);
   r.x  += r.vx;
@@ -307,6 +332,22 @@ function update() {
       life: 1,
     });
   }
+
+  // Gem collection
+  const hitR = (CFG.ROCKET_W * 0.6) + CFG.GEM_R;
+  const hitR2 = hitR * hitR;
+  game.gems.forEach(g => {
+    if (g.taken) return;
+    const sy = game.scroll - g.wy + H * 0.5;
+    if (sy < -CFG.GEM_R || sy > H + CFG.GEM_R) return;
+    const dx = g.x - r.x;
+    const dy = sy - r.y;
+    if (dx * dx + dy * dy < hitR2) {
+      g.taken = true;
+      sndGem();
+      spawnBurst(g.x, sy, 18);
+    }
+  });
 
   // Milestones at 40% and 75%
   const prog = game.altitude / CFG.FINISH_ALT;
@@ -362,6 +403,7 @@ function draw() {
   drawClouds(prog);
   drawPlanets();
   drawShooting();
+  drawGems();
   drawFlames();
   drawBursts();
   drawRocket(game.rocket.x, game.rocket.y);
@@ -468,6 +510,51 @@ function drawShooting() {
     ctx.beginPath();
     ctx.moveTo(s.x, s.y);
     ctx.lineTo(s.x - s.vx * 11, s.y - s.vy * 11);
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function drawGems() {
+  game.gems.forEach(g => {
+    if (g.taken) return;
+    const sy = game.scroll - g.wy + H * 0.5;
+    if (sy < -CFG.GEM_R * 2 || sy > H + CFG.GEM_R * 2) return;
+    g.bob += 0.06;
+    const off  = Math.sin(g.bob) * 6;
+    const r    = CFG.GEM_R;
+    const cy   = sy + off;
+    const hue  = (g.hue + game.frame * 0.6) % 360;
+
+    ctx.save();
+    // glow halo
+    const halo = ctx.createRadialGradient(g.x, cy, 0, g.x, cy, r * 2);
+    halo.addColorStop(0, `hsla(${hue},100%,70%,0.55)`);
+    halo.addColorStop(1, `hsla(${hue},100%,70%,0)`);
+    ctx.fillStyle = halo;
+    ctx.fillRect(g.x - r * 2, cy - r * 2, r * 4, r * 4);
+
+    // five-pointed star
+    ctx.translate(g.x, cy);
+    ctx.rotate(Math.sin(g.bob * 0.4) * 0.15);
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const ang = (i / 10) * Math.PI * 2 - Math.PI / 2;
+      const rad = i % 2 === 0 ? r : r * 0.45;
+      const px  = Math.cos(ang) * rad;
+      const py  = Math.sin(ang) * rad;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    const fillGrd = ctx.createRadialGradient(0, -r * 0.3, 0, 0, 0, r);
+    fillGrd.addColorStop(0, `hsl(${hue},100%,82%)`);
+    fillGrd.addColorStop(1, `hsl(${hue},100%,55%)`);
+    ctx.fillStyle = fillGrd;
+    ctx.shadowColor = `hsl(${hue},100%,65%)`;
+    ctx.shadowBlur  = 14;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
     ctx.stroke();
     ctx.restore();
   });
